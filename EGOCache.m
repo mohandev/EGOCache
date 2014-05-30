@@ -237,13 +237,21 @@ static inline NSString* cachePathForKey(NSString* directory, NSString* key) {
 - (void)setData:(NSData*)data forKey:(NSString*)key withTimeoutInterval:(NSTimeInterval)timeoutInterval {
 	CHECK_FOR_EGOCACHE_PLIST();
 	
-	NSString* cachePath = cachePathForKey(_directory, key);
+    // Protect the cached data via HW encryption!
+    if ([UIApplication sharedApplication].protectedDataAvailable) {
+        NSString* cachePath = cachePathForKey(_directory, key);
+        
+        dispatch_async(_diskQueue, ^{
+            NSError *err = nil;
+            [data writeToFile:cachePath options:(NSDataWritingAtomic|NSDataWritingFileProtectionComplete) error:&err];
+        });
+        
+        [self setCacheTimeoutInterval:timeoutInterval forKey:key];
+    }
+    else {
+        NSLog(@"[UIApplication sharedApplication].protectedDataAvailable == NO");
+    }
 	
-	dispatch_async(_diskQueue, ^{
-		[data writeToFile:cachePath atomically:YES];
-	});
-	
-	[self setCacheTimeoutInterval:timeoutInterval forKey:key];
 }
 
 - (void)setNeedsSave {
